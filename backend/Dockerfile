@@ -9,7 +9,8 @@ COPY ["backend.csproj", "./"]
 RUN dotnet restore "./backend.csproj"
 
 # Copy the rest and publish
-COPY . .
+COPY ./appsettings* ./
+COPY ./src ./src
 RUN dotnet publish "backend.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM ${DOTNET_RUNTIME_IMAGE} AS runtime
