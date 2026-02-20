@@ -1,0 +1,13 @@
+networks:
+  backend:
+    name: mary-guiden-backend
+
+services:
+  backend:
+    build: .
+    container_name: mary-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8080"
+    networks:
+      - backend
