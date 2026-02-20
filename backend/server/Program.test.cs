@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
-namespace Mary.Backend.Tests;
+namespace Mary.Server.Tests;
 
 public class GraphQLTests : IClassFixture<WebApplicationFactory<Program>>
 {

@@ -1,4 +1,4 @@
-using Mary.Backend.Schema;
+using Mary.Server.Schema;
 using GraphQL;
 using GraphQL.Types;
 

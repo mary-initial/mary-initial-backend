@@ -1,7 +1,7 @@
 using GraphQL;
 using GraphQL.Types;
 
-namespace Mary.Backend.Schema
+namespace Mary.Server.Schema
 {
     public class Query : ObjectGraphType
     {

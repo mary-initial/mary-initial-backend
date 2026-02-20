@@ -4,14 +4,14 @@ ARG DOTNET_RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0-noble
 FROM ${DOTNET_SDK_IMAGE} AS build
 WORKDIR /src
 
-# Copy csproj and restore first for better caching
-COPY ["backend.csproj", "./"]
-RUN dotnet restore "./backend.csproj"
+# Copy solution and project files first for better caching
+COPY ["backend.slnx", "./"]
+COPY ["server/server.csproj", "server/"]
+RUN dotnet restore "server/server.csproj"
 
-# Copy the rest and publish
-COPY ./appsettings* ./
-COPY ./src ./src
-RUN dotnet publish "backend.csproj" -c Release -o /app/publish /p:UseAppHost=false
+# Copy the rest of the source and publish
+COPY . .
+RUN dotnet publish "server/server.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM ${DOTNET_RUNTIME_IMAGE} AS runtime
 WORKDIR /app
@@ -24,4 +24,4 @@ COPY --from=build /app/publish ./
 RUN chown -R mary-app:mary-app .
 
 USER mary-app
-ENTRYPOINT ["dotnet", "backend.dll"]
+ENTRYPOINT ["dotnet", "server.dll"]
