@@ -9,7 +9,7 @@ This document describes the target architecture for a mobile-first enterprise pl
 - WebUI client (information screens)
 - .NET 10 GraphQL API backend
 - Umbraco CMS
-- Keycloak (federated to Entra ID for staging logins)
+- Keycloak (federated to Entra ID or Active directory for staging logins)
 - PostgreSQL cluster (operator-managed)
 
 The platform is designed for:
