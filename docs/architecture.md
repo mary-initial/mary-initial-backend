@@ -295,14 +295,14 @@ D[Promotion Approval]
 end
 
 subgraph AKS_DEV
-E[Deploy API .NET 10]
+E[Deploy API]
 end
 
-subgraph OCP_TEST
+subgraph OpenShift_TEST
 F[Deploy API]
 end
 
-subgraph OCP_PROD
+subgraph OpenShift_PROD
 G[Deploy API]
 end
 
