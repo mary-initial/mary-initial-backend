@@ -253,7 +253,7 @@ Characteristics:
 
 ## 4. CI/CD & Promotion Flow
 
-Backend (.NET 10 API + CMS)
+### Backend (.NET 10 API + CMS)
 
 Pipeline:
 
@@ -270,3 +270,58 @@ Pipeline:
 6. Deploy to TEST (OpenShift).
 7. Approval gate.
 8. Deploy to PROD (OpenShift).
+
+### Mobile Apps (Expo + GitHub)
+
+1. Commit to GitHub.
+2. GitHub Actions triggers Expo EAS build.
+3. Signed artifacts generated.
+4. Publish to:
+- Apple App Store
+- Google Play Store
+
+## 5. CI/CD Promotion Flow
+```mermaid
+flowchart LR
+
+subgraph Devs
+A[Code Commit]
+end
+
+subgraph GitHub
+B[GitHub Actions Build]
+C[Container Registry]
+D[Promotion Approval]
+end
+
+subgraph AKS_DEV
+E[Deploy API .NET 10]
+end
+
+subgraph OCP_TEST
+F[Deploy API]
+end
+
+subgraph OCP_PROD
+G[Deploy API]
+end
+
+subgraph Mobile
+H[Expo Build]
+I[Apple App Store]
+J[Google Play Store]
+end
+
+A --> B
+B --> C
+B --> E
+E --> D
+D --> F
+F --> G
+
+A --> H
+H --> I
+H --> J
+
+```
+
