@@ -2,10 +2,13 @@
 
 Backend service for the Mary project.
 
-This will hold 
-- a C# .NET core codebase which implements a graphql service for the frontend, some kind of CMS, and integrations to other services. 
+This will hold
+
+- a C# .NET core codebase which implements a graphql service for the frontend, some kind of CMS, and integrations to other services.
 - a github pipeline for ci and cd.
 - a terraform codebase for deploying on kubernetes.
+
+Everything below is AI generated, take it with a grain of salt.
 
 ## Getting Started
 
