@@ -1,5 +1,42 @@
 # Mary Guide Platform Architecture
 
+## Table of Contents
+
+- [Mary Guide Platform Architecture](#mary-guide-platform-architecture)
+  - [1. Introduction](#1-introduction)
+  - [2. Technology Choices & Architecture Decisions](#2-technology-choices--architecture-decisions)
+    - [ADR-001: Backend Runtime (.NET 10)](#adr-001-backend-runtime-net-10)
+      - [Decision](#decision)
+      - [Rationale](#rationale)
+      - [Consequences](#consequences)
+    - [ADR-002: API Architecture](#adr-002-api-architecture)
+      - [Decision](#decision-1)
+      - [Rationale](#rationale-1)
+      - [Scaling Model](#scaling-model)
+    - [ADR-003: Kubernetes Platform Strategy](#adr-003-kubernetes-platform-strategy)
+      - [Decision](#decision-2)
+      - [Rationale](#rationale-2)
+    - [ADR-004: Edge & Ingress](#adr-004-edge--ingress)
+      - [Decision](#decision-3)
+      - [Rationale](#rationale-3)
+    - [ADR-005: Identity Architecture](#adr-005-identity-architecture)
+      - [Decision](#decision-4)
+      - [Rationale](#rationale-4)
+    - [ADR-006: Database Strategy](#adr-006-database-strategy)
+      - [Decision](#decision-5)
+      - [Rationale](#rationale-5)
+    - [ADR-007: CMS Strategy](#adr-007-cms-strategy)
+      - [Decision](#decision-6)
+      - [Rationale](#rationale-6)
+  - [3. Environment Architecture](#3-environment-architecture)
+    - [DEV (Azure Kubernetes Service)](#dev-azure-kubernetes-service)
+    - [TEST (OpenShift)](#test-openshift)
+    - [PROD (OpenShift)](#prod-openshift)
+  - [4. CI/CD & Promotion Flow](#4-cicd--promotion-flow)
+    - [Backend (.NET 10 API + CMS)](#backend-net-10-api--cms)
+    - [Mobile Apps (Expo + GitHub)](#mobile-apps-expo--github)
+  - [5. CI/CD Promotion Flow](#5-cicd-promotion-flow)
+
 ## 1. Introduction
 
 This document describes the target architecture for a mobile-first enterprise platform  for the Mary guide consisting of:
