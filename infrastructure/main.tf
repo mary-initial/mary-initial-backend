@@ -125,10 +125,14 @@ resource "kubernetes_deployment_v1" "backend" {
       spec {
         container {
           image = "ghcr.io/mary-initial/mary-initial-backend/backend:${var.image-tag}"
+          env {
+            name  = "PORT"
+            value = 8080
+          }
 
           name = "backend"
           port {
-            container_port = 80
+            container_port = 8080
           }
         }
         image_pull_secrets {
