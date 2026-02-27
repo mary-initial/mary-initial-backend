@@ -13,7 +13,8 @@ var app = builder.Build();
 
 app.UseDeveloperExceptionPage();
 
-app.MapGet("/healthz", () => Results.Ok(new { status = true }));
+app.MapGet("/livez", () => Results.Ok(new { status = true }));
+app.MapGet("/readyz", () => Results.Ok(new { status = true }));
 
 app.UseGraphQL("/api/graphql");
 app.UseGraphQLGraphiQL("/", new GraphQL.Server.Ui.GraphiQL.GraphiQLOptions
