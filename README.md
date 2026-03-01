@@ -10,6 +10,13 @@ This will hold
 
 Everything below is AI generated, take it with a grain of salt.
 
+# Documentation
+
+The documentation for the project and architechture can be found here:
+
+[Architechure](https://github.com/mary-initial/mary-initial-backend/blob/main/docs/architecture.md)
+
+
 ## Getting Started
 
 ### Prerequisites
