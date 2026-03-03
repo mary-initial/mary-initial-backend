@@ -1,11 +1,12 @@
-name: Build and Publish Backend
+name: Backend Build and Publish
 
 on:
   push:
     branches:
       - main
     paths:
-      - backend/*
+      - backend/**
+      - .github/**
   workflow_dispatch:
 
 env:

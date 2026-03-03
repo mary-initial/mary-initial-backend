@@ -1,0 +1,23 @@
+name: Backend Test
+
+on:
+  pull_request:
+    paths:
+      - backend/**
+      - .github/**
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Test
+        run: cd backend && dotnet test
