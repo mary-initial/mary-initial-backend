@@ -127,12 +127,12 @@ resource "kubernetes_deployment_v1" "backend" {
           image = "ghcr.io/mary-initial/mary-initial-backend/backend:${var.image-tag}"
           env {
             name  = "PORT"
-            value = 8080
+            value = 8000
           }
 
           name = "backend"
           port {
-            container_port = 8080
+            container_port = 8000
           }
         }
         image_pull_secrets {
@@ -180,7 +180,7 @@ resource "kubernetes_service_v1" "backend" {
 
     port {
       port        = 80
-      target_port = 80
+      target_port = 8000
     }
 
     type = "LoadBalancer"
