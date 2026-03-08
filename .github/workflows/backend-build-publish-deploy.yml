@@ -83,7 +83,7 @@ jobs:
           echo "key=\"${{ secrets.TF_KEY }}\"" >> backend-config.tfvars
 
       - name: Terraform Init
-        run: terraform -chdir=infrastructure init -backend-config=backend-config.tfvars -migrate-state -input=false
+        run: terraform -chdir=infrastructure init -backend-config=backend-config.tfvars -input=false
 
       - name: Write Terraform Variables
         run: |
