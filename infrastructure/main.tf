@@ -21,6 +21,17 @@ variable "ghcr_token" {
 }
 
 terraform {
+  backend "azurerm" {
+    use_oidc         = true
+    use_azuread_auth = true
+    container_name   = "tfstate" # Can be passed via `-backend-config=`"container_name=<container name>"` in the `init` command.
+
+    # tenant_id        = "00000000-0000-0000-0000-000000000000" # Set via `ARM_TENANT_ID` environment variable.
+    # client_id        = "00000000-0000-0000-0000-000000000000" # Set via `ARM_CLIENT_ID` environment variable.
+    # storage_account_name = "handykidtfstate" # Passed via `-backend-config=`"storage_account_name=<storage account name>"` in the `init` command.
+    # key                  = "dev.tfstate" # Passed via `-backend-config=`"key=<blob key name>"` in the `init` command.
+  }
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -54,6 +65,35 @@ resource "azurerm_resource_group" "default" {
     environment = "Demo"
     created_by  = "Terraform"
   }
+}
+
+resource "azurerm_storage_account" "terraform_state" {
+  name                       = "${replace(random_pet.prefix.id, "-", "")}tfstate"
+  resource_group_name        = azurerm_resource_group.default.name
+  location                   = azurerm_resource_group.default.location
+  account_tier               = "Standard"
+  account_replication_type   = "LRS"
+  account_kind               = "BlobStorage"
+  https_traffic_only_enabled = true
+  min_tls_version            = "TLS1_2"
+
+  blob_properties {
+    versioning_enabled = true
+    container_delete_retention_policy {
+      days = 90
+    }
+  }
+
+  tags = {
+    environment = "Demo"
+    created_by  = "Terraform"
+  }
+}
+
+resource "azurerm_storage_container" "terraform_state" {
+  name                  = "tfstate"
+  storage_account_id    = azurerm_storage_account.terraform_state.id
+  container_access_type = "private"
 }
 
 resource "azurerm_kubernetes_cluster" "default" {
