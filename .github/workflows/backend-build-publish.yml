@@ -65,6 +65,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
 
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Change to infrastructure
+        run: cd infrastructure
+
       - name: Write Backend Config
         run: |
           echo "storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT_NAME }}" >> backend-config.tfvars
