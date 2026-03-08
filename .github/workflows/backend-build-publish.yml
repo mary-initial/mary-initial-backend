@@ -15,9 +15,9 @@ jobs:
     permissions:
       contents: read
       packages: write
-      env:
-        REGISTRY: ghcr.io
-        REPO_NAME: ${{ github.repository }}
+    env:
+      REGISTRY: ghcr.io
+      REPO_NAME: ${{ github.repository }}
     outputs:
       image-tag: ${{ steps.export-tag.outputs.image-tag }}
     steps:
