@@ -68,19 +68,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Change to infrastructure
-        run: cd infrastructure
-
       - name: Write Backend Config
         run: |
+          cd infrastructure
           echo "storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT_NAME }}" >> backend-config.tfvars
           echo "key=${{ secrets.TF_KEY }}" >> backend-config.tfvars
 
       - name: Terraform Init
-        run: terraform init -backend-config=backend-config.tfvars -migrate-state -input=false
+        run: terraform -chdir=infrastructure init -backend-config=backend-config.tfvars -migrate-state -input=false
 
       - name: Write Terraform Variables
         run: |
+          cd infrastructure
           echo "appId=${{ secrets.AZURE_APP_ID }}" >> terraform.tfvars
           echo "password=${{ secrets.AZURE_PASSWORD }}" >> terraform.tfvars
           echo "ghcr_token=${{ secrets.GHCR_TOKEN }}" >> terraform.tfvars
@@ -88,4 +87,4 @@ jobs:
           echo "image-tag=${{ needs.build.outputs.image-tag }}" >> terraform.tfvars
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform -chdir=infrastructure apply -auto-approve
