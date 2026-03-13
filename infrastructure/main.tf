@@ -45,6 +45,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.7.2"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 3.1.1"
+    }
   }
 
   required_version = ">= 1.14.0"
@@ -133,11 +137,117 @@ resource "azurerm_kubernetes_cluster" "default" {
   }
 }
 
+provider "helm" {
+  kubernetes = {
+    load_config_file       = false
+    host                   = azurerm_kubernetes_cluster.default.kube_config[0].host
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].cluster_ca_certificate)
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].client_key)
+  }
+}
+
+resource "helm_release" "envoy" {
+  name             = "envoy"
+  chart            = "oci://docker.io/envoyproxy/gateway-helm"
+  create_namespace = true
+  version          = "v1.7.1"
+}
+
 provider "kubernetes" {
   host                   = azurerm_kubernetes_cluster.default.kube_config[0].host
   cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].cluster_ca_certificate)
   client_certificate     = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].client_certificate)
   client_key             = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].client_key)
+}
+
+resource "kubernetes_manifest" "gateway_class" {
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "GatewayClass"
+    metadata = {
+      name = "eg"
+    }
+    spec = {
+      controllerName = "gateway.envoyproxy.io/gatewayclass-controller"
+    }
+  }
+}
+
+resource "kubernetes_manifest" "gateway" {
+  manifest = {
+    apiVersion = "gateway.networking.k8s.io/v1"
+    kind       = "Gateway"
+    metadata = {
+      name      = "eg"
+      namespace = "default"
+    }
+    spec = {
+      gatewayClassName = "eg"
+      listeners = [
+        {
+          name     = "http"
+          protocol = "HTTP"
+          port     = 80
+        },
+        {
+          name     = "https"
+          protocol = "HTTPS"
+          port     = 443
+        }
+      ]
+    }
+  }
+}
+
+resource "kubernetes_secret_v1" "ghcr" {
+  metadata {
+    name = "ghcr-secret"
+    labels = {
+      created_by = "Terraform"
+    }
+  }
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "ghcr.io" = {
+          username = var.ghcr_username
+          password = var.ghcr_token
+          auth     = base64encode("${var.ghcr_username}:${var.ghcr_token}")
+        }
+      }
+    })
+  }
+  type = "kubernetes.io/dockerconfigjson"
+}
+
+resource "kubernetes_service_account_v1" "backend" {
+  metadata {
+    name = "backend"
+  }
+}
+
+resource "kubernetes_service_v1" "backend" {
+  metadata {
+    name = "backend"
+    labels = {
+      created_by = "Terraform"
+      app        = "wip"
+      service    = "backend"
+    }
+  }
+
+  spec {
+    selector = {
+      app = "wip"
+    }
+
+    port {
+      name        = "http"
+      port        = 8080
+      target_port = 8080
+    }
+  }
 }
 
 resource "kubernetes_deployment_v1" "backend" {
@@ -167,12 +277,12 @@ resource "kubernetes_deployment_v1" "backend" {
           image = "ghcr.io/mary-initial/mary-initial-backend/backend:${var.image-tag}"
           env {
             name  = "PORT"
-            value = 8000
+            value = 8080
           }
 
           name = "backend"
           port {
-            container_port = 8000
+            container_port = 8080
           }
         }
         image_pull_secrets {
@@ -183,48 +293,24 @@ resource "kubernetes_deployment_v1" "backend" {
   }
 }
 
-resource "kubernetes_secret_v1" "ghcr" {
-  metadata {
-    name = "ghcr-secret"
-    labels = {
-      created_by = "Terraform"
-    }
-  }
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "ghcr.io" = {
-          username = var.ghcr_username
-          password = var.ghcr_token
-          auth     = base64encode("${var.ghcr_username}:${var.ghcr_token}")
-        }
-      }
-    })
-  }
-  type = "kubernetes.io/dockerconfigjson"
-}
-
-
-resource "kubernetes_service_v1" "backend" {
-  metadata {
-    name = "backend"
-    labels = {
-      created_by = "Terraform"
-    }
-  }
-
-  spec {
-    selector = {
-      app = kubernetes_deployment_v1.backend.spec[0].selector[0].match_labels.app
-    }
-
-    port {
-      port        = 80
-      target_port = 8000
-    }
-
-    type = "LoadBalancer"
-  }
+resource "kubernetes_manifest" "http_route" {
+  manifest = yamldecode(<<EOT
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backend
+  namespace: default
+spec:
+  parentRefs:
+    - name: eg
+  # hostnames:
+  #   - "test.marys.dk"
+  rules:
+    - backendRefs:
+        - name: backend
+          port: 8080
+EOT
+  )
 }
 
 output "resource_group_name" {
@@ -240,7 +326,7 @@ output "kubernetes_cluster_name" {
 #   sensitive = true
 # }
 
-output "backend_ip" {
-  description = "Public IP address of the backend service"
-  value       = kubernetes_service_v1.backend.status[0].load_balancer[0].ingress[0].ip
-}
+# output "backend_ip" {
+#   description = "Public IP address of the backend service"
+#   value       = kubernetes_service_v1.backend.status[0].load_balancer[0].ingress[0].ip
+# }
