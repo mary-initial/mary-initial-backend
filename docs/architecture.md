@@ -12,6 +12,8 @@
     - [ADR-005: Identity Architecture](#adr-005-identity-architecture)
     - [ADR-006: Database Strategy](#adr-006-database-strategy)
     - [ADR-007: CMS Strategy](#adr-007-cms-strategy)
+    - [ADR-008: Mobile App Platform Strategy](#adr-008-mobile-app-platform-strategy)
+    - [ADR-009: Mobile App Deployment Strategy](#adr-009-mobile-app-deployment-strategy)
   - [3. Environment Architecture](#3-environment-architecture)
     - [DEV (Azure Kubernetes Service)](#dev-azure-kubernetes-service)
     - [TEST (OpenShift)](#test-openshift)
@@ -205,6 +207,42 @@ F5 handles:
 - Separation from API.
 
 - Clear editorial boundary.
+
+## ADR-008: Mobile App Platform Strategy
+
+### Decision
+
+- React Native using Expo framework
+
+- Target platforms: Android, iOS and Web
+
+### Rationale
+
+- Single code base for all plaforms. Based on TypeScript and React framework a highly common skill-set.
+
+- Android and iOS apps are compiled to native code, fulfulling high requirements for user experience.
+
+- Expo provides an effective React native development experience.
+
+## ADR-009: Mobile App Deployment Strategy
+
+### Decision
+
+- Use Expo Application Services (EAS) for app builds and submission to app stores.
+
+- Use EAS workflows for composing deploy workflows.
+
+- Integrate EAS with Github repo to enable EAS workflows.
+
+- Manual approval steps are introduces for critical production flows.
+
+### Rationale
+
+- EAS provides specific CI/CD functionality for building apps and has multiple distribution channels for dev, preview and productions builds.
+
+- Easily integrates with Google Play Store and Apple App Store for app submissions.
+
+- Provides over-the-air updates service for fast udpates.
 
 # 3. Environment Architecture
 
