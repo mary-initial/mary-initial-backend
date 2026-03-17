@@ -96,6 +96,7 @@ jobs:
           echo "ghcr_username=\"${{ secrets.GHCR_USERNAME }}\"" >> terraform.tfvars
           echo "image-tag=\"${{ needs.build.outputs.image-tag }}\"" >> terraform.tfvars
           echo "basic_auth=\"${{ secrets.BASIC_AUTH }}\"" >> terraform.tfvars
+          echo "storybook_image_tag=\"${{ vars.STORYBOOK_IMAGE_TAG }}\"" >> terraform.tfvars
 
       - name: Terraform Apply
         run: terraform -chdir=infrastructure apply -auto-approve

@@ -17,7 +17,7 @@ app.MapGet("/livez", () => Results.Ok(new { status = true }));
 app.MapGet("/readyz", () => Results.Ok(new { status = true }));
 
 app.UseGraphQL("/api/graphql");
-app.UseGraphQLGraphiQL("/", new GraphQL.Server.Ui.GraphiQL.GraphiQLOptions
+app.UseGraphQLGraphiQL("/api/graphiql", new GraphQL.Server.Ui.GraphiQL.GraphiQLOptions
 {
     GraphQLEndPoint = "/api/graphql",         // url of GraphQL endpoint
     // SubscriptionsEndPoint = "/api/graphql",   // url of GraphQL endpoint
