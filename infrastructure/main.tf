@@ -20,6 +20,11 @@ variable "ghcr_token" {
   sensitive   = true
 }
 
+variable "basic_auth" {
+  description = "The username and password in .htpasswd format"
+  sensitive   = true
+}
+
 terraform {
   backend "azurerm" {
     use_oidc         = true
@@ -276,6 +281,40 @@ resource "kubernetes_secret_v1" "ghcr" {
   type = "kubernetes.io/dockerconfigjson"
 }
 
+resource "kubernetes_secret_v1" "basic_auth" {
+  metadata {
+    # I think this is referenced from basic_auth_security_policy
+    name = "basic-auth"
+    labels = {
+      created_by = "Terraform"
+    }
+  }
+
+  data = {
+    ".htpasswd" = var.basic_auth
+  }
+}
+
+resource "kubernetes_manifest" "basic_auth_security_policy" {
+  manifest = yamldecode(<<-EOT
+    apiVersion: gateway.envoyproxy.io/v1alpha1
+    kind: SecurityPolicy
+    metadata:
+      name: basic-auth
+      namespace: "default"
+    spec:
+      targetRefs:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          name: backend
+      basicAuth:
+        users:
+          name: "basic-auth"
+  
+    EOT
+  )
+}
+
 resource "kubernetes_service_account_v1" "backend" {
   metadata {
     name = "backend"
@@ -376,11 +415,13 @@ output "kubernetes_cluster_name" {
   value = azurerm_kubernetes_cluster.default.name
 }
 
+# Useful when you want to get the kubeconfig locally.
 # output "host" {
 #   value     = azurerm_kubernetes_cluster.default.kube_config.0.host
 #   sensitive = true
 # }
 
+# Useful when you want to see the backend's ip, in case that changes.
 # output "backend_ip" {
 #   description = "Public IP address of the backend service"
 #   value       = kubernetes_service_v1.backend.status[0].load_balancer[0].ingress[0].ip
