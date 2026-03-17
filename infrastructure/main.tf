@@ -225,7 +225,8 @@ resource "kubernetes_manifest" "gateway" {
       name      = "eg"
       namespace = "default"
       annotations = {
-        "cert-manager.io/cluster-issuer" = "letsencrypt"
+        "cert-manager.io/cluster-issuer"         = "letsencrypt"
+        "cert-manager.io/revision-history-limit" = 3
       }
     }
     spec = {
@@ -306,11 +307,10 @@ resource "kubernetes_manifest" "basic_auth_security_policy" {
       targetRefs:
         - group: gateway.networking.k8s.io
           kind: HTTPRoute
-          name: backend
+          name: https-httproute
       basicAuth:
         users:
           name: "basic-auth"
-  
     EOT
   )
 }
@@ -387,23 +387,46 @@ resource "kubernetes_deployment_v1" "backend" {
   }
 }
 
-resource "kubernetes_manifest" "http_route" {
-  manifest = yamldecode(<<EOT
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: backend
-  namespace: default
-spec:
-  parentRefs:
-    - name: eg
-  hostnames:
-    - "test.marys.dk"
-  rules:
-    - backendRefs:
-        - name: backend
-          port: 8080
-EOT
+resource "kubernetes_manifest" "http_https_redirect" {
+  manifest = yamldecode(<<-EOT
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: http_https_redirect
+      namespace: default
+    spec:
+      parentRefs:
+        - name: eg
+          sectionName: http
+      hostnames:
+        - "test.marys.dk"
+      rules:
+        - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+    EOT
+  )
+}
+
+resource "kubernetes_manifest" "https_route" {
+  manifest = yamldecode(<<-EOT
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: https-httproute
+      namespace: default
+    spec:
+      parentRefs:
+        - name: eg
+          sectionName: https
+      hostnames:
+        - "test.marys.dk"
+      rules:
+        - backendRefs:
+          - name: backend
+            port: 8080
+    EOT
   )
 }
 
