@@ -58,7 +58,6 @@ provider "azurerm" {
   features {}
 }
 
-
 resource "random_pet" "prefix" {}
 
 resource "azurerm_resource_group" "default" {
@@ -174,6 +173,45 @@ resource "kubernetes_manifest" "gateway_class" {
   }
 }
 
+resource "helm_release" "cert_manager" {
+  # Envoy's custom resource definitions must load first.
+  depends_on       = [helm_release.envoy]
+  name             = "cert-manager"
+  chart            = "oci://quay.io/jetstack/charts/cert-manager:v1.20.0"
+  version          = "v1.20.0"
+  namespace        = "cert-manager"
+  create_namespace = true
+  set = [
+    { name = "crds.enabled", value = true },
+    # { name = "config.apiVersion", value = "controller.config.cert-manager.io/v1alpha1" },
+    { name = "config.enableGatewayAPI", value = true }
+  ]
+  timeouts = {
+    # this took ~8 minutes in the dev cluster, which made terraform time out.
+    create = "15m"
+  }
+}
+
+resource "kubernetes_manifest" "certificate_issuer" {
+  manifest = yamldecode(<<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: helle.holm.clausen@regionh.dk
+    privateKeySecretRef:
+      name: letsencrypt-account-key
+    solvers:
+      - http01:
+          # So weird but this works. See https://hackmd.io/@maelvls/test-xlistenerset. Found it through https://github.com/cert-manager/cert-manager/issues/7473.
+          gatewayHTTPRoute: {}
+EOF
+  )
+}
+
 resource "kubernetes_manifest" "gateway" {
   manifest = {
     apiVersion = "gateway.networking.k8s.io/v1"
@@ -181,6 +219,9 @@ resource "kubernetes_manifest" "gateway" {
     metadata = {
       name      = "eg"
       namespace = "default"
+      annotations = {
+        "cert-manager.io/cluster-issuer" = "letsencrypt"
+      }
     }
     spec = {
       gatewayClassName = "eg"
@@ -188,12 +229,26 @@ resource "kubernetes_manifest" "gateway" {
         {
           name     = "http"
           protocol = "HTTP"
+          hostname = "test.marys.dk"
           port     = 80
+          allowedRoutes = {
+            namespaces = {
+              from = "All"
+            }
+          }
         },
         {
           name     = "https"
           protocol = "HTTPS"
+          hostname = "test.marys.dk"
           port     = 443
+          tls = {
+            mode = "Terminate"
+            certificateRefs = [{
+              kind = "Secret"
+              name = "eg-https"
+            }]
+          }
         }
       ]
     }
@@ -303,8 +358,8 @@ metadata:
 spec:
   parentRefs:
     - name: eg
-  # hostnames:
-  #   - "test.marys.dk"
+  hostnames:
+    - "test.marys.dk"
   rules:
     - backendRefs:
         - name: backend
