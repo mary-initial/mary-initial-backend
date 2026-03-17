@@ -25,6 +25,10 @@ variable "basic_auth" {
   sensitive   = true
 }
 
+variable "storybook_image_tag" {
+  description = "Image tag of the storybook image to deploy."
+}
+
 terraform {
   backend "azurerm" {
     use_oidc         = true
@@ -307,7 +311,7 @@ resource "kubernetes_manifest" "basic_auth_security_policy" {
       targetRefs:
         - group: gateway.networking.k8s.io
           kind: HTTPRoute
-          name: https-httproute
+          name: router
       basicAuth:
         users:
           name: "basic-auth"
@@ -387,12 +391,75 @@ resource "kubernetes_deployment_v1" "backend" {
   }
 }
 
+resource "kubernetes_service_v1" "storybook" {
+  metadata {
+    name = "storybook"
+    labels = {
+      created_by = "Terraform"
+      app        = "storybook"
+      service    = "storybook"
+    }
+  }
+
+  spec {
+    selector = {
+      app = "storybook"
+    }
+
+    port {
+      name        = "http"
+      port        = 8080
+      target_port = 80
+    }
+  }
+}
+
+resource "kubernetes_deployment_v1" "storybook" {
+  metadata {
+    name = "storybook-deployment"
+    labels = {
+      app        = "storybook"
+      created_by = "Terraform"
+    }
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "storybook"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app        = "storybook"
+          created_by = "Terraform"
+        }
+      }
+      spec {
+        container {
+          image = "ghcr.io/mary-initial/mary-initial-frontend/storybook:${var.storybook_image_tag}"
+          name  = "storybook"
+          port {
+            container_port = 80
+          }
+        }
+        image_pull_secrets {
+          name = kubernetes_secret_v1.ghcr.metadata[0].name
+        }
+      }
+    }
+  }
+
+}
+
 resource "kubernetes_manifest" "http_https_redirect" {
   manifest = yamldecode(<<-EOT
     apiVersion: gateway.networking.k8s.io/v1
     kind: HTTPRoute
     metadata:
-      name: http_https_redirect
+      name: http-https-redirect
       namespace: default
     spec:
       parentRefs:
@@ -414,7 +481,7 @@ resource "kubernetes_manifest" "https_route" {
     apiVersion: gateway.networking.k8s.io/v1
     kind: HTTPRoute
     metadata:
-      name: https-httproute
+      name: router
       namespace: default
     spec:
       parentRefs:
@@ -423,8 +490,15 @@ resource "kubernetes_manifest" "https_route" {
       hostnames:
         - "test.marys.dk"
       rules:
-        - backendRefs:
+        - matches: [{
+            "path": {
+              "value": "/api",
+              "type": "PathPrefix"}}]
+          backendRefs:
           - name: backend
+            port: 8080
+        - backendRefs:
+          - name: storybook
             port: 8080
     EOT
   )
