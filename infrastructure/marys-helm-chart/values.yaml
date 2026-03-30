@@ -1,0 +1,16 @@
+# Configuration for the backend
+backend:
+  image_tag: "backend-image-tag"
+
+# Configuration for storybook
+storybook:
+  image_tag: "storybook-image-tag"
+
+hostname: "hostname.dk"
+
+# Credentials for pulling images from github.
+ghcr_token: "ghcr_token"
+ghcr_username: "ghcr_username"
+
+# Credentials for viewing the website.
+basic_auth: "basic_auth"
