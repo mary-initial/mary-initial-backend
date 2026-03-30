@@ -7,7 +7,7 @@ variable "password" {
   sensitive   = true
 }
 
-variable "image-tag" {
+variable "image_tag" {
   description = "Image tag of the version to deploy"
 }
 
@@ -79,6 +79,8 @@ resource "azurerm_resource_group" "default" {
   }
 }
 
+## Store the terraform state.
+
 resource "azurerm_storage_account" "terraform_state" {
   name                       = "${replace(random_pet.prefix.id, "-", "")}tfstate"
   resource_group_name        = azurerm_resource_group.default.name
@@ -107,6 +109,8 @@ resource "azurerm_storage_container" "terraform_state" {
   storage_account_id    = azurerm_storage_account.terraform_state.id
   container_access_type = "private"
 }
+
+## Create the azure kubernetes cluster.
 
 resource "azurerm_kubernetes_cluster" "default" {
   name                = "${random_pet.prefix.id}-aks"
@@ -145,6 +149,8 @@ resource "azurerm_kubernetes_cluster" "default" {
   }
 }
 
+## Add the CRDs for the packages we use cluster-wide
+
 provider "helm" {
   kubernetes = {
     load_config_file       = false
@@ -160,25 +166,10 @@ resource "helm_release" "envoy" {
   chart            = "oci://docker.io/envoyproxy/gateway-helm"
   create_namespace = true
   version          = "v1.7.1"
-}
-
-provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.default.kube_config[0].host
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].cluster_ca_certificate)
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.default.kube_config[0].client_key)
-}
-
-resource "kubernetes_manifest" "gateway_class" {
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "GatewayClass"
-    metadata = {
-      name = "eg"
-    }
-    spec = {
-      controllerName = "gateway.envoyproxy.io/gatewayclass-controller"
-    }
+  timeouts = {
+    # this took more than the default timeout in the dev cluster, which made terraform time out.
+    create = "15m"
+    update = "15m"
   }
 }
 
@@ -201,307 +192,31 @@ resource "helm_release" "cert_manager" {
   }
 }
 
-resource "kubernetes_manifest" "certificate_issuer" {
-  manifest = yamldecode(<<EOF
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: helle.holm.clausen@regionh.dk
-    privateKeySecretRef:
-      name: letsencrypt-account-key
-    solvers:
-      - http01:
-          # So weird but this works. See https://hackmd.io/@maelvls/test-xlistenerset. Found it through https://github.com/cert-manager/cert-manager/issues/7473.
-          gatewayHTTPRoute: {}
-EOF
-  )
-}
-
-resource "kubernetes_manifest" "gateway" {
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "Gateway"
-    metadata = {
-      name      = "eg"
-      namespace = "default"
-      annotations = {
-        "cert-manager.io/cluster-issuer"         = "letsencrypt"
-        "cert-manager.io/revision-history-limit" = 3
-      }
-    }
-    spec = {
-      gatewayClassName = "eg"
-      listeners = [
-        {
-          name     = "http"
-          protocol = "HTTP"
-          hostname = "test.marys.dk"
-          port     = 80
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-        },
-        {
-          name     = "https"
-          protocol = "HTTPS"
-          hostname = "test.marys.dk"
-          port     = 443
-          tls = {
-            mode = "Terminate"
-            certificateRefs = [{
-              kind = "Secret"
-              name = "eg-https"
-            }]
-          }
-        }
-      ]
-    }
-  }
-}
-
-resource "kubernetes_secret_v1" "ghcr" {
-  metadata {
-    name = "ghcr-secret"
-    labels = {
-      created_by = "Terraform"
-    }
-  }
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "ghcr.io" = {
-          username = var.ghcr_username
-          password = var.ghcr_token
-          auth     = base64encode("${var.ghcr_username}:${var.ghcr_token}")
-        }
-      }
-    })
-  }
-  type = "kubernetes.io/dockerconfigjson"
-}
-
-resource "kubernetes_secret_v1" "basic_auth" {
-  metadata {
-    # I think this is referenced from basic_auth_security_policy
-    name = "basic-auth"
-    labels = {
-      created_by = "Terraform"
-    }
-  }
-
-  data = {
-    ".htpasswd" = var.basic_auth
-  }
-}
-
-resource "kubernetes_manifest" "basic_auth_security_policy" {
-  manifest = yamldecode(<<-EOT
-    apiVersion: gateway.envoyproxy.io/v1alpha1
-    kind: SecurityPolicy
-    metadata:
-      name: basic-auth
-      namespace: "default"
-    spec:
-      targetRefs:
-        - group: gateway.networking.k8s.io
-          kind: HTTPRoute
-          name: router
-      basicAuth:
-        users:
-          name: "basic-auth"
-    EOT
-  )
-}
-
-resource "kubernetes_service_account_v1" "backend" {
-  metadata {
-    name = "backend"
-  }
-}
-
-resource "kubernetes_service_v1" "backend" {
-  metadata {
-    name = "backend"
-    labels = {
-      created_by = "Terraform"
-      app        = "wip"
-      service    = "backend"
-    }
-  }
-
-  spec {
-    selector = {
-      app = "wip"
-    }
-
-    port {
-      name        = "http"
-      port        = 8080
-      target_port = 8080
-    }
-  }
-}
-
-resource "kubernetes_deployment_v1" "backend" {
-  metadata {
-    name = "demo-deployment"
-    labels = {
-      app        = "wip"
-      created_by = "Terraform"
-    }
-  }
-  spec {
-    replicas = 1
-    selector {
-      match_labels = {
-        app = "wip"
-      }
-    }
-    template {
-      metadata {
-        labels = {
-          app        = "wip"
-          created_by = "Terraform"
-        }
-      }
-      spec {
-        container {
-          image = "ghcr.io/mary-initial/mary-initial-backend/backend:${var.image-tag}"
-          env {
-            name  = "PORT"
-            value = 8080
-          }
-
-          name = "backend"
-          port {
-            container_port = 8080
-          }
-        }
-        image_pull_secrets {
-          name = kubernetes_secret_v1.ghcr.metadata[0].name
-        }
-      }
-    }
-  }
-}
-
-resource "kubernetes_service_v1" "storybook" {
-  metadata {
-    name = "storybook"
-    labels = {
-      created_by = "Terraform"
-      app        = "storybook"
-      service    = "storybook"
-    }
-  }
-
-  spec {
-    selector = {
-      app = "storybook"
-    }
-
-    port {
-      name        = "http"
-      port        = 8080
-      target_port = 80
-    }
-  }
-}
-
-resource "kubernetes_deployment_v1" "storybook" {
-  metadata {
-    name = "storybook-deployment"
-    labels = {
-      app        = "storybook"
-      created_by = "Terraform"
-    }
-  }
-  spec {
-    replicas = 1
-    selector {
-      match_labels = {
-        app = "storybook"
-      }
-    }
-
-    template {
-      metadata {
-        labels = {
-          app        = "storybook"
-          created_by = "Terraform"
-        }
-      }
-      spec {
-        container {
-          image = "ghcr.io/mary-initial/mary-initial-frontend/storybook:${var.storybook_image_tag}"
-          name  = "storybook"
-          port {
-            container_port = 80
-          }
-        }
-        image_pull_secrets {
-          name = kubernetes_secret_v1.ghcr.metadata[0].name
-        }
-      }
-    }
-  }
-
-}
-
-resource "kubernetes_manifest" "http_https_redirect" {
-  manifest = yamldecode(<<-EOT
-    apiVersion: gateway.networking.k8s.io/v1
-    kind: HTTPRoute
-    metadata:
-      name: http-https-redirect
-      namespace: default
-    spec:
-      parentRefs:
-        - name: eg
-          sectionName: http
-      hostnames:
-        - "test.marys.dk"
-      rules:
-        - filters:
-          - type: RequestRedirect
-            requestRedirect:
-              scheme: https
-    EOT
-  )
-}
-
-resource "kubernetes_manifest" "https_route" {
-  manifest = yamldecode(<<-EOT
-    apiVersion: gateway.networking.k8s.io/v1
-    kind: HTTPRoute
-    metadata:
-      name: router
-      namespace: default
-    spec:
-      parentRefs:
-        - name: eg
-          sectionName: https
-      hostnames:
-        - "test.marys.dk"
-      rules:
-        - matches: [{
-            "path": {
-              "value": "/api",
-              "type": "PathPrefix"}}]
-          backendRefs:
-          - name: backend
-            port: 8080
-        - backendRefs:
-          - name: storybook
-            port: 8080
-    EOT
-  )
+resource "helm_release" "marys" {
+  depends_on       = [helm_release.cert_manager]
+  name             = "marys"
+  chart            = "./marys-helm-chart"
+  namespace        = "default"
+  create_namespace = true
+  set = [{
+    name  = "backend.image_tag",
+    value = var.image_tag
+    }, {
+    name  = "storybook.image_tag",
+    value = var.storybook_image_tag
+    }, {
+    name  = "ghcr_username",
+    value = var.ghcr_username
+    }, {
+    name  = "ghcr_token",
+    value = var.ghcr_token
+    }, {
+    name  = "hostname",
+    value = "test.marys.dk"
+    }, {
+    name  = "basic_auth",
+    value = var.basic_auth
+  }]
 }
 
 output "resource_group_name" {
@@ -516,10 +231,4 @@ output "kubernetes_cluster_name" {
 # output "host" {
 #   value     = azurerm_kubernetes_cluster.default.kube_config.0.host
 #   sensitive = true
-# }
-
-# Useful when you want to see the backend's ip, in case that changes.
-# output "backend_ip" {
-#   description = "Public IP address of the backend service"
-#   value       = kubernetes_service_v1.backend.status[0].load_balancer[0].ingress[0].ip
 # }

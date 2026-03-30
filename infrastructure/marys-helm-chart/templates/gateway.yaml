@@ -1,0 +1,74 @@
+apiVersion: "gateway.networking.k8s.io/v1"
+kind: "Gateway"
+metadata:
+  name: "eg"
+  namespace: "default"
+  annotations:
+    "cert-manager.io/cluster-issuer": "letsencrypt"
+    "cert-manager.io/revision-history-limit": "3"
+  labels:
+    {{- include "marys.labels" . | nindent 4 }}
+spec:
+  gatewayClassName: "eg"
+  listeners:
+    - name: "http"
+      protocol: "HTTP"
+      hostname: {{ .Values.hostname }}
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: "All"
+    - name: "https"
+      protocol: "HTTPS"
+      hostname: {{ .Values.hostname }}
+      port: 443
+      tls:
+        mode: "Terminate"
+        certificateRefs:
+          - kind: "Secret"
+            name: "eg-https"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-https-redirect
+  namespace: default
+  labels:
+    {{- include "marys.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: eg
+      sectionName: http
+  hostnames:
+    - {{ .Values.hostname }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: router
+  namespace: default
+  labels:
+    {{- include "marys.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: eg
+      sectionName: https
+  hostnames:
+    - {{ .Values.hostname }}
+  rules:
+    - matches:
+        - path:
+            type: "PathPrefix"
+            value: "/api"
+      backendRefs:
+        - name: backend
+          port: 8080
+    - backendRefs:
+        - name: storybook
+          port: 8080
