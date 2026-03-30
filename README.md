@@ -1,3 +1,7 @@
+# Archived
+
+Development continues at RegionH's repository here: https://github.com/RegionH/Marys-Marys.
+
 # Backend
 
 Backend service for the Mary project.
